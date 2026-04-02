@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
 import API from '../services/api';
@@ -24,10 +24,14 @@ const EditStudentForm = () => {
     studyHours: '',
     previousMarks: '',
     assignmentScore: '',
-    subjects: createDefaultSubjects(1),
+    subjects: createDefaultSubjects(1, DEPARTMENTS[0]),
   });
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const previousAcademicSelection = useRef({
+    department: DEPARTMENTS[0],
+    semester: 1,
+  });
 
 
   useEffect(() => {
@@ -35,6 +39,10 @@ const EditStudentForm = () => {
       try {
         const response = await API.get(`/students/${id}`);
         const data = response?.data?.data;
+        previousAcademicSelection.current = {
+          department: data?.department || DEPARTMENTS[0],
+          semester: data?.semester || 1,
+        };
         setInitialValues({
           studentId: data?.studentId || '',
           name: data?.name || '',
@@ -49,7 +57,7 @@ const EditStudentForm = () => {
           studyHours: data?.studyHours || '',
           previousMarks: data?.previousMarks || '',
           assignmentScore: data?.assignmentScore || '',
-          subjects: data?.subjects?.length ? data.subjects : createDefaultSubjects(data?.semester || 1),
+          subjects: data?.subjects?.length ? data.subjects : createDefaultSubjects(data?.semester || 1, data?.department || DEPARTMENTS[0]),
         });
       } catch (err) {
         notifyError(err?.response?.data?.message || 'Failed to fetch student');
@@ -108,6 +116,25 @@ const EditStudentForm = () => {
     },
   });
 
+  const { values, setFieldValue } = formik;
+
+  useEffect(() => {
+    if (loading) return;
+
+    const currentDepartment = values.department;
+    const currentSemester = Number(values.semester) || 1;
+    const departmentChanged = previousAcademicSelection.current.department !== currentDepartment;
+    const semesterChanged = previousAcademicSelection.current.semester !== currentSemester;
+
+    if (departmentChanged || semesterChanged) {
+      setFieldValue('subjects', createDefaultSubjects(currentSemester, currentDepartment), false);
+      previousAcademicSelection.current = {
+        department: currentDepartment,
+        semester: currentSemester,
+      };
+    }
+  }, [loading, setFieldValue, values.department, values.semester]);
+
   if (loading) return <p>Loading...</p>;
 
   return (
@@ -128,11 +155,7 @@ const EditStudentForm = () => {
               </TextField>
             </Grid>
             <Grid item xs={12} md={2}>
-              <TextField fullWidth margin="normal" name="semester" label="Semester" type="number" value={formik.values.semester} onChange={(event) => {
-                formik.handleChange(event);
-                const nextSemester = Number(event.target.value) || 1;
-                formik.setFieldValue('subjects', formik.values.subjects.map((subject) => ({ ...subject, semester: nextSemester })));
-              }} />
+              <TextField fullWidth margin="normal" name="semester" label="Semester" type="number" value={formik.values.semester} onChange={formik.handleChange} />
             </Grid>
             <Grid item xs={12} md={2}>
               <TextField select fullWidth margin="normal" name="gender" label="Gender" value={formik.values.gender} onChange={formik.handleChange}>
@@ -168,7 +191,7 @@ const EditStudentForm = () => {
           </Grid>
         </Paper>
 
-        <Typography variant="h5" gutterBottom>Subject Performance</Typography>
+        <Typography variant="h5" gutterBottom>Subject Performance for {formik.values.department} - Semester {formik.values.semester}</Typography>
         <Stack spacing={2}>
           {formik.values.subjects.map((subject, index) => (
             <Paper key={`${subject.code}-${index}`} sx={{ p: 2.5, borderRadius: 4 }}>

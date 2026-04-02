@@ -16,6 +16,7 @@ import {
     Grid,
     LinearProgress,
     MenuItem,
+    Pagination,
     Paper,
     Stack,
     Tab,
@@ -316,6 +317,9 @@ function Dashboard() {
     const [students, setStudents] = useState([]);
     const [loading, setLoading] = useState(true);
     const [loadingPredictionIds, setLoadingPredictionIds] = useState([]);
+    const [page, setPage] = useState(1);
+    const [rowsPerPage, setRowsPerPage] = useState(10);
+    const [pagination, setPagination] = useState({ total: 0, page: 1, limit: 10, totalPages: 1 });
     const [filters, setFilters] = useState({
         name: '',
         department: '',
@@ -331,27 +335,28 @@ function Dashboard() {
         filtersRef.current = filters;
     }, [filters]);
 
-    const loadDashboard = useCallback(async (appliedFilters = filtersRef.current) => {
+    const loadDashboard = useCallback(async (appliedFilters = filtersRef.current, nextPage = page, nextLimit = rowsPerPage) => {
         setLoading(true);
         try {
             const [analyticsResponse, studentsResponse] = await Promise.all([
                 API.get('/analytics/dashboard', { params: appliedFilters }),
-                API.get('/students', { params: { ...appliedFilters, limit: 50 } }),
+                API.get('/students', { params: { ...appliedFilters, page: nextPage, limit: nextLimit } }),
             ]);
 
             setAnalytics(analyticsResponse?.data?.data || null);
             setStudents(studentsResponse?.data?.data || []);
+            setPagination(studentsResponse?.data?.pagination || { total: 0, page: nextPage, limit: nextLimit, totalPages: 1 });
         } catch (error) {
             notifyError(error?.response?.data?.message || 'Unable to load analytics dashboard');
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [page, rowsPerPage]);
 
     useEffect(() => {
         const initialFilters = { name: '', department: '', semester: '', gender: '', subject: '', riskLevel: '' };
-        loadDashboard(initialFilters);
-    }, [loadDashboard]);
+        loadDashboard(initialFilters, 1, rowsPerPage);
+    }, [loadDashboard, rowsPerPage]);
 
     const handlePredictResult = async (studentId) => {
         setLoadingPredictionIds((prev) => [...prev, studentId]);
@@ -360,7 +365,7 @@ function Dashboard() {
             const { message, data } = response?.data || {};
             if (response?.data?.statusCode === 200) {
                 notifySuccess(`${message} → ${data?.studentName}: ${data?.prediction}`);
-                loadDashboard();
+                loadDashboard(filtersRef.current, page, rowsPerPage);
             } else {
                 notifyError(message || 'An error occurred while predicting the result');
             }
@@ -376,13 +381,27 @@ function Dashboard() {
     };
 
     const handleApplyFilters = () => {
-        loadDashboard(filters);
+        setPage(1);
+        loadDashboard(filters, 1, rowsPerPage);
     };
 
     const clearFilters = () => {
         const reset = { name: '', department: '', semester: '', gender: '', subject: '', riskLevel: '' };
         setFilters(reset);
-        loadDashboard(reset);
+        setPage(1);
+        loadDashboard(reset, 1, rowsPerPage);
+    };
+
+    const handlePageChange = (_, value) => {
+        setPage(value);
+        loadDashboard(filtersRef.current, value, rowsPerPage);
+    };
+
+    const handleRowsPerPageChange = (event) => {
+        const nextLimit = Number(event.target.value) || 10;
+        setRowsPerPage(nextLimit);
+        setPage(1);
+        loadDashboard(filtersRef.current, 1, nextLimit);
     };
 
     const quickInsight = useMemo(() => {
@@ -459,7 +478,8 @@ function Dashboard() {
                                         onClick={() => {
                                             const next = { ...filtersRef.current, department, riskLevel: '' };
                                             setFilters(next);
-                                            loadDashboard(next);
+                                            setPage(1);
+                                            loadDashboard(next, 1, rowsPerPage);
                                         }}
                                     />
                                 ))}
@@ -471,7 +491,8 @@ function Dashboard() {
                                     onClick={() => {
                                         const next = { ...filtersRef.current, riskLevel: filtersRef.current.riskLevel === 'High' ? '' : 'High' };
                                         setFilters(next);
-                                        loadDashboard(next);
+                                        setPage(1);
+                                        loadDashboard(next, 1, rowsPerPage);
                                     }}
                                 />
                             </Stack>
@@ -553,7 +574,8 @@ function Dashboard() {
                                                 const nextDepartment = filtersRef.current.department === department ? '' : department;
                                                 const next = { ...filtersRef.current, department: nextDepartment };
                                                 setFilters(next);
-                                                loadDashboard(next);
+                                                setPage(1);
+                                                loadDashboard(next, 1, rowsPerPage);
                                             }}
                                         />
                                     </Grid>
@@ -566,7 +588,8 @@ function Dashboard() {
                                                 const nextSemester = String(filtersRef.current.semester) === String(semester) ? '' : semester;
                                                 const next = { ...filtersRef.current, semester: nextSemester };
                                                 setFilters(next);
-                                                loadDashboard(next);
+                                                setPage(1);
+                                                loadDashboard(next, 1, rowsPerPage);
                                             }}
                                         />
                                     </Grid>
@@ -579,7 +602,8 @@ function Dashboard() {
                                                 const nextRisk = filtersRef.current.riskLevel === riskLevel ? '' : riskLevel;
                                                 const next = { ...filtersRef.current, riskLevel: nextRisk };
                                                 setFilters(next);
-                                                loadDashboard(next);
+                                                setPage(1);
+                                                loadDashboard(next, 1, rowsPerPage);
                                             }}
                                         />
                                     </Grid>
@@ -597,7 +621,8 @@ function Dashboard() {
                                                 const nextSubject = filtersRef.current.subject === subject ? '' : subject;
                                                 const next = { ...filtersRef.current, subject: nextSubject };
                                                 setFilters(next);
-                                                loadDashboard(next);
+                                                setPage(1);
+                                                loadDashboard(next, 1, rowsPerPage);
                                             }}
                                         />
                                     </Grid>
@@ -620,6 +645,23 @@ function Dashboard() {
                                                         <Typography variant="body2" color="text.secondary">Use this list to jump from cohort-level patterns into individual profiles.</Typography>
                                                     </Box>
                                                     <Chip label={`${students.length} records`} variant="outlined" />
+                                                </Stack>
+                                                <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'start', md: 'center' }} spacing={2} mb={2}>
+                                                    <Typography variant="body2" color="text.secondary">
+                                                        Showing page {pagination.page} of {pagination.totalPages} with {pagination.total} total students
+                                                    </Typography>
+                                                    <TextField
+                                                        select
+                                                        size="small"
+                                                        label="Rows"
+                                                        value={rowsPerPage}
+                                                        onChange={handleRowsPerPageChange}
+                                                        sx={{ minWidth: 110 }}
+                                                    >
+                                                        {[5, 10, 20, 50].map((option) => (
+                                                            <MenuItem key={option} value={option}>{option}</MenuItem>
+                                                        ))}
+                                                    </TextField>
                                                 </Stack>
                                                 <TableContainer>
                                                     <Table size="small">
@@ -671,6 +713,14 @@ function Dashboard() {
                                                         </TableBody>
                                                     </Table>
                                                 </TableContainer>
+                                                <Stack direction="row" justifyContent="center" mt={3}>
+                                                    <Pagination
+                                                        count={pagination.totalPages || 1}
+                                                        page={pagination.page || 1}
+                                                        onChange={handlePageChange}
+                                                        color="primary"
+                                                    />
+                                                </Stack>
                                             </CardContent>
                                         </Card>
                                     </Grid>

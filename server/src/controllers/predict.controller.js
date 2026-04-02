@@ -1,6 +1,6 @@
 import { Student } from "../models/Student.js";
 import { spawn } from "child_process";
-import { calculateRiskProfile } from "../utils/studentAnalytics.js";
+import { average, calculateRiskProfile } from "../utils/studentAnalytics.js";
 
 export const predictStudentResult = async (req, res) => {
     try {
@@ -46,12 +46,32 @@ export const predictStudentResult = async (req, res) => {
             });
         };
 
-        const py = spawn("python", [
+        const subjectAverage = student.subjects?.length
+            ? average(student.subjects.map((subject) => subject.marks))
+            : student.previousMarks;
+        const subjectAttendanceAverage = student.subjects?.length
+            ? average(student.subjects.map((subject) => subject.attendance))
+            : student.attendance;
+
+        const predictionPayload = JSON.stringify({
+            Department: student.department,
+            Semester: Number(student.semester || 1),
+            Gender: student.gender,
+            Age: Number(student.age || 0),
+            Course: student.course,
+            GPA: Number(student.gpa || 0),
+            "Credits Earned": Number(student.creditsEarned || 0),
+            "Attendance (%)": Number(student.attendance || 0),
+            "Study Hours per Day": Number(student.studyHours || 0),
+            "Previous Marks (%)": Number(student.previousMarks || 0),
+            "Assignment Score": Number(student.assignmentScore || 0),
+            "Subject Average (%)": Number(subjectAverage || 0),
+            "Subject Attendance Average (%)": Number(subjectAttendanceAverage || 0),
+        });
+
+        const py = spawn(process.env.PYTHON_BIN || "python3", [
             "./microservice/predict.py",
-            student.attendance,
-            student.studyHours,
-            student.previousMarks,
-            student.assignmentScore,
+            predictionPayload,
         ]);
 
         let output = "";

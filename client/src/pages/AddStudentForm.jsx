@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
 import API from '../services/api';
@@ -7,7 +7,6 @@ import {
 } from '@mui/material';
 import { notifyError, notifySuccess } from '../services/toastNotifications';
 import { useNavigate } from 'react-router-dom';
-import { useState } from 'react';
 import { COURSES, createDefaultSubjects, DEPARTMENTS, GENDERS } from '../constants';
 
 const AddStudentForm = () => {
@@ -29,7 +28,7 @@ const AddStudentForm = () => {
             studyHours: '',
             previousMarks: '',
             assignmentScore: '',
-            subjects: createDefaultSubjects(1),
+            subjects: createDefaultSubjects(1, DEPARTMENTS[0]),
         },
         validationSchema: Yup.object({
             studentId: Yup.string().required('Student ID is required'),
@@ -75,6 +74,16 @@ const AddStudentForm = () => {
         },
     });
 
+    const { values, setFieldValue } = formik;
+
+    useEffect(() => {
+        setFieldValue(
+            'subjects',
+            createDefaultSubjects(Number(values.semester) || 1, values.department),
+            false
+        );
+    }, [setFieldValue, values.department, values.semester]);
+
     return (
         <Container maxWidth="lg" style={{ marginTop: '40px', marginBottom: '40px' }}>
             <Typography variant="h4" gutterBottom>Add Academic Profile</Typography>
@@ -93,11 +102,7 @@ const AddStudentForm = () => {
                             </TextField>
                         </Grid>
                         <Grid item xs={12} md={2}>
-                            <TextField fullWidth margin="normal" name="semester" label="Semester" type="number" value={formik.values.semester} onChange={(event) => {
-                                formik.handleChange(event);
-                                const nextSemester = Number(event.target.value) || 1;
-                                formik.setFieldValue('subjects', formik.values.subjects.map((subject) => ({ ...subject, semester: nextSemester })));
-                            }} />
+                            <TextField fullWidth margin="normal" name="semester" label="Semester" type="number" value={formik.values.semester} onChange={formik.handleChange} />
                         </Grid>
                         <Grid item xs={12} md={2}>
                             <TextField select fullWidth margin="normal" name="gender" label="Gender" value={formik.values.gender} onChange={formik.handleChange}>
@@ -133,7 +138,7 @@ const AddStudentForm = () => {
                     </Grid>
                 </Paper>
 
-                <Typography variant="h5" gutterBottom>Subject Performance</Typography>
+                <Typography variant="h5" gutterBottom>Subject Performance for {formik.values.department} - Semester {formik.values.semester}</Typography>
                 <Stack spacing={2}>
                     {formik.values.subjects.map((subject, index) => (
                         <Paper key={`${subject.code}-${index}`} sx={{ p: 2.5, borderRadius: 4 }}>

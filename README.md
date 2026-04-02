@@ -41,23 +41,54 @@ An end-to-end MERN + Machine Learning project for academic performance analysis.
 
 ## 🧮 Predictive Analytics
 
-- Python microservice supports model-based prediction using:
-  - Attendance (%)
-  - Study Hours per Day
-  - Previous Marks (%)
-  - Assignment Score
+The project now uses a Python microservice aligned with the updated academic data model.
 
-- The web app also computes a dashboard-friendly academic risk profile using:
-  - GPA
-  - Subject average
-  - Attendance
-  - Study hours
-  - Previous performance
+### Academic Features Used By The Python Model
+- Department
+- Semester
+- Gender
+- Age
+- Course
+- GPA
+- Credits Earned
+- Attendance (%)
+- Study Hours per Day
+- Previous Marks (%)
+- Assignment Score
+- Subject Average (%)
+- Subject Attendance Average (%)
 
-- Outputs:
-  - `On Track` or `At Risk`
-  - `Low`, `Moderate`, or `High` risk level
-  - Numeric risk score for prioritization
+### Python ML Flow
+- `generate_academic_dataset.py`
+  - generates a synthetic academic dataset with the updated feature set
+- `train_model.py`
+  - trains a logistic regression pipeline using:
+    - one-hot encoding for categorical academic fields
+    - scaling for numeric academic fields
+- `predict.py`
+  - loads the trained model and predicts from a JSON academic payload sent by the Node.js backend
+
+### Prediction Output
+- Python model output:
+  - `On Track`
+  - `At Risk`
+
+### Dashboard Risk Layer
+In addition to the Python model, the web app computes an application-side academic risk profile for dashboard analytics using:
+- GPA
+- Subject average
+- Attendance
+- Study hours
+- Previous marks
+- Assignment score
+
+This produces:
+- `Low`, `Moderate`, or `High` risk level
+- numeric risk score
+- readiness score for student drill-down views
+
+### Current Note
+The Python training dataset is currently synthetic/generated for demonstration and development. The prediction flow is aligned with the new academic structure, but it is not yet trained on a real institutional dataset.
 
 ---
 
@@ -66,7 +97,7 @@ An end-to-end MERN + Machine Learning project for academic performance analysis.
 📦 root
 ├── 📁 server                           # Backend + ML Microservice
 │   ├── 📁 microservice                 # Python ML code
-│   │   ├── generate_training_data_1000.py
+│   │   ├── generate_academic_dataset.py
 │   │   ├── predict.py
 │   │   ├── student_performance_dataset.csv
 │   │   ├── student_performance_model.joblib

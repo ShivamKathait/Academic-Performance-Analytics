@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "nodemon server.js",
-    "generate:dataset": "python ./microservice/generate_training_data_1000.py",
+    "generate:dataset": "python ./microservice/generate_academic_dataset.py",
     "train:model": "python ./microservice/train_model.py"
   },
   "keywords": [],

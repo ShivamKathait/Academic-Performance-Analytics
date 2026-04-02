@@ -1,31 +1,55 @@
+import os
+import joblib
 import pandas as pd
-from sklearn.model_selection import train_test_split
+from sklearn.compose import ColumnTransformer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score
-import joblib
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
-# Load dataset
-df = pd.read_csv("./microservice/student_performance_dataset.csv")
+CURRENT_DIR = os.path.dirname(__file__)
+DATASET_PATH = os.path.join(CURRENT_DIR, "student_performance_dataset.csv")
+MODEL_PATH = os.path.join(CURRENT_DIR, "student_performance_model.joblib")
+TARGET_COLUMN = "Predicted Result"
 
-# Convert Result column to binary
-df['Result'] = df['Result'].map({'Pass': 1, 'Fail': 0})
 
-# Feature and target split
-X = df.drop('Result', axis=1)
-y = df['Result']
+def main():
+    df = pd.read_csv(DATASET_PATH)
+    df[TARGET_COLUMN] = df[TARGET_COLUMN].map({"On Track": 1, "At Risk": 0})
 
-# Split data into training and testing
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+    X = df.drop(TARGET_COLUMN, axis=1)
+    y = df[TARGET_COLUMN]
 
-# Train logistic regression model
-model = LogisticRegression()
-model.fit(X_train, y_train)
+    categorical_features = ["Department", "Gender", "Course"]
+    numeric_features = [column for column in X.columns if column not in categorical_features]
 
-# Predict and evaluate
-y_pred = model.predict(X_test)
-accuracy = accuracy_score(y_test, y_pred)
-print(f"Model Accuracy: {accuracy * 100:.2f}%")
+    preprocessor = ColumnTransformer(
+        transformers=[
+            ("categorical", OneHotEncoder(handle_unknown="ignore"), categorical_features),
+            ("numeric", StandardScaler(), numeric_features),
+        ]
+    )
 
-# Save the trained model to disk
-joblib.dump(model, './microservice/student_performance_model.joblib')
-print("Model saved successfully.")
+    model = Pipeline(
+        steps=[
+            ("preprocessor", preprocessor),
+            ("classifier", LogisticRegression(max_iter=1200)),
+        ]
+    )
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.25, random_state=42, stratify=y
+    )
+
+    model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+    accuracy = accuracy_score(y_test, y_pred)
+    print(f"Model Accuracy: {accuracy * 100:.2f}%")
+
+    joblib.dump(model, MODEL_PATH)
+    print("Updated academic model saved successfully.")
+
+
+if __name__ == "__main__":
+    main()
