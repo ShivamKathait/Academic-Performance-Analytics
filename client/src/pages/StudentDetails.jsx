@@ -36,7 +36,7 @@
 // export default StudentDetails;
 
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import API from '../services/api';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
@@ -44,7 +44,10 @@ import {
     TableCell, TableContainer, TableHead, TableRow,
     Paper, CircularProgress, Container, Box,
     CardActions,
-    Button
+    Button,
+    Chip,
+    Grid,
+    Stack
 } from '@mui/material';
 import { notifyError, notifySuccess } from '../services/toastNotifications';
 
@@ -55,7 +58,7 @@ function StudentDetails() {
     const [loading, setLoading] = useState(true);
     const [loadingPrediction, setLoadingPrediction] = useState(false);
 
-    const fetchStudentDetails = async () => {
+    const fetchStudentDetails = useCallback(async () => {
         setLoading(true);
         try {
             const response = await API.get(`/students/${id}`);
@@ -69,7 +72,7 @@ function StudentDetails() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [id]);
 
 
     // Handle Predict Result
@@ -78,7 +81,6 @@ function StudentDetails() {
 
         try {
             const response = await API.post(`/predict/${id}`);
-            console.log(`response`, response)
             const { message, data } = response?.data || {};
 
             if (response?.data?.statusCode === 200) {
@@ -95,25 +97,49 @@ function StudentDetails() {
     };
 
     useEffect(() => {
-        fetchStudentDetails();
-    }, [id]);
+        const loadStudent = async () => {
+            await fetchStudentDetails();
+        };
+
+        loadStudent();
+    }, [fetchStudentDetails]);
+
     if (loading) return <Box display="flex" justifyContent="center" mt={5}><CircularProgress /></Box>;
     if (!student) return null;
 
+    const risk = student.analyticsRisk || {};
+
     return (
         <Container maxWidth="lg" sx={{ mt: 4 }}>
-            <Card sx={{ mb: 4 }}>
+            <Card sx={{ mb: 4, borderRadius: 4 }}>
                 <CardContent>
-                    <Typography variant="h5" gutterBottom>Student Details</Typography>
-                    <Typography><strong>Name:</strong> {student.name}</Typography>
-                    <Typography><strong>Attendance:</strong> {student.attendance}%</Typography>
-                    <Typography><strong>Study Hours:</strong> {student.studyHours} hrs</Typography>
-                    <Typography><strong>Previous Marks:</strong> {student.previousMarks}</Typography>
-                    <Typography><strong>Assignment Score:</strong> {student.assignmentScore}</Typography>
+                    <Box display="flex" justifyContent="space-between" gap={2} flexWrap="wrap" mb={2}>
+                        <Box>
+                            <Typography variant="overline" color="text.secondary">{student.department} • Semester {student.semester}</Typography>
+                            <Typography variant="h4" gutterBottom>{student.name}</Typography>
+                            <Typography color="text.secondary">Student ID: {student.studentId || 'N/A'}</Typography>
+                        </Box>
+                        <Stack direction="row" spacing={1} alignItems="start">
+                            <Chip label={`${risk.riskLevel || student.riskLevel || 'Moderate'} Risk`} color={risk.riskLevel === 'High' ? 'error' : risk.riskLevel === 'Moderate' ? 'warning' : 'success'} />
+                            <Chip label={`${risk.riskScore || 0} Risk Score`} variant="outlined" />
+                        </Stack>
+                    </Box>
 
+                    <Grid container spacing={2}>
+                        <Grid item xs={12} md={3}><Typography><strong>Gender:</strong> {student.gender}</Typography></Grid>
+                        <Grid item xs={12} md={3}><Typography><strong>Age:</strong> {student.age}</Typography></Grid>
+                        <Grid item xs={12} md={3}><Typography><strong>Course:</strong> {student.course}</Typography></Grid>
+                        <Grid item xs={12} md={3}><Typography><strong>Credits Earned:</strong> {student.creditsEarned}</Typography></Grid>
+                        <Grid item xs={12} md={3}><Typography><strong>Attendance:</strong> {student.attendance}%</Typography></Grid>
+                        <Grid item xs={12} md={3}><Typography><strong>Study Hours:</strong> {student.studyHours} hrs</Typography></Grid>
+                        <Grid item xs={12} md={3}><Typography><strong>Previous Marks:</strong> {student.previousMarks}</Typography></Grid>
+                        <Grid item xs={12} md={3}><Typography><strong>GPA:</strong> {student.gpa}</Typography></Grid>
+                        <Grid item xs={12} md={3}><Typography><strong>Assignment Score:</strong> {student.assignmentScore}/10</Typography></Grid>
+                        <Grid item xs={12} md={3}><Typography><strong>Readiness Score:</strong> {risk.readinessScore || 0}</Typography></Grid>
+                        <Grid item xs={12} md={3}><Typography><strong>Subject Avg:</strong> {risk.subjectAverage || 0}</Typography></Grid>
+                    </Grid>
                 </CardContent>
                 <CardActions sx={{ justifyContent: 'end', px: 2 }}>
-
                     <Button size="small" variant="contained" color="primary"
                         onClick={() => navigate(`/students/edit/${id}`)}
                     >
@@ -128,8 +154,36 @@ function StudentDetails() {
                 </CardActions>
             </Card>
 
+            <Typography variant="h6" gutterBottom>Subject Analytics</Typography>
+            <TableContainer component={Paper} sx={{ mb: 4, borderRadius: 4 }}>
+                <Table size="small">
+                    <TableHead>
+                        <TableRow>
+                            <TableCell>Code</TableCell>
+                            <TableCell>Subject</TableCell>
+                            <TableCell>Semester</TableCell>
+                            <TableCell>Credits</TableCell>
+                            <TableCell>Marks</TableCell>
+                            <TableCell>Attendance</TableCell>
+                        </TableRow>
+                    </TableHead>
+                    <TableBody>
+                        {(student.subjects || []).map((subject) => (
+                            <TableRow key={subject._id || subject.code}>
+                                <TableCell>{subject.code}</TableCell>
+                                <TableCell>{subject.name}</TableCell>
+                                <TableCell>{subject.semester}</TableCell>
+                                <TableCell>{subject.credits}</TableCell>
+                                <TableCell>{subject.marks}</TableCell>
+                                <TableCell>{subject.attendance}%</TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </TableContainer>
+
             <Typography variant="h6" gutterBottom>Prediction History</Typography>
-            <TableContainer component={Paper}>
+            <TableContainer component={Paper} sx={{ borderRadius: 4 }}>
                 <Table size="small">
                     <TableHead>
                         <TableRow>
@@ -138,6 +192,8 @@ function StudentDetails() {
                             <TableCell>Study Hours</TableCell>
                             <TableCell>Previous Marks</TableCell>
                             <TableCell>Assignment Score</TableCell>
+                            <TableCell>Risk Level</TableCell>
+                            <TableCell>Risk Score</TableCell>
                             <TableCell>Predicted Result</TableCell>
                         </TableRow>
                     </TableHead>
@@ -149,8 +205,10 @@ function StudentDetails() {
                                 <TableCell>{pred.studyHours}</TableCell>
                                 <TableCell>{pred.previousMarks}</TableCell>
                                 <TableCell>{pred.assignmentScore}</TableCell>
+                                <TableCell>{pred.riskLevel || '--'}</TableCell>
+                                <TableCell>{pred.riskScore ?? '--'}</TableCell>
                                 <TableCell>
-                                    <strong style={{ color: pred.predictedResult === 'Pass' ? 'green' : 'red' }}>
+                                    <strong style={{ color: pred.predictedResult === 'At Risk' || pred.predictedResult === 'Fail' ? '#c62828' : '#2e7d32' }}>
                                         {pred.predictedResult}
                                     </strong>
                                 </TableCell>

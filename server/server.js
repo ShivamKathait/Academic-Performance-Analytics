@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import authRoutes from './src/routes/auth.routes.js';
 import studentRoutes from './src/routes/student.routes.js';
 import predictRoutes from "./src/routes/predict.routes.js";
+import analyticsRoutes from "./src/routes/analytics.routes.js";
 import cors from 'cors';
 
 dotenv.config();
@@ -15,6 +16,7 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/students', studentRoutes);
 app.use("/api/predict", predictRoutes);
+app.use("/api/analytics", analyticsRoutes);
 
 mongoose
   .connect(process.env.MONGO_URI)
