@@ -32,6 +32,8 @@ const predictionSchema = new mongoose.Schema({
     riskScore: Number,
     predictedResult: String,
     riskLevel: String,
+    reasons: [String],
+    probabilities: mongoose.Schema.Types.Mixed,
     createdAt: {
         type: Date,
         default: Date.now

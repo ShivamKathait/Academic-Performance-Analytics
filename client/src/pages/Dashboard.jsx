@@ -33,7 +33,7 @@ import {
 import { DEPARTMENTS, GENDERS } from '../constants';
 
 const chartPalette = ['#0f766e', '#f97316', '#2563eb', '#7c3aed', '#dc2626', '#0891b2'];
-const riskColors = { Low: '#15803d', Moderate: '#ea580c', High: '#b91c1c' };
+const riskColors = { 'On Track': '#15803d', 'Needs Attention': '#ea580c', 'At Risk': '#b91c1c' };
 
 function MetricCard({ title, value, subtitle, tone = 'primary', progress = 0 }) {
     return (
@@ -198,7 +198,7 @@ function DistributionCard({ title, distribution, onSelectRisk, activeRisk }) {
         <Card sx={{ borderRadius: 5, height: '100%' }}>
             <CardContent>
                 <Typography variant="h6">{title}</Typography>
-                <Typography variant="body2" color="text.secondary">Tap a risk band to focus the dashboard.</Typography>
+                <Typography variant="body2" color="text.secondary">Tap a prediction band to focus the dashboard.</Typography>
                 <Stack spacing={2} mt={2}>
                     {Object.entries(distribution || {}).map(([label, value]) => (
                         <Box
@@ -245,7 +245,7 @@ function ScatterPlotCard({ points }) {
         <Card sx={{ borderRadius: 5, height: '100%' }}>
             <CardContent>
                 <Typography variant="h6">Attendance vs Marks</Typography>
-                <Typography variant="body2" color="text.secondary">Each point is a student. High-risk students appear in red.</Typography>
+                <Typography variant="body2" color="text.secondary">Each point is a student. Prediction bands are color-coded for quick scanning.</Typography>
                 {points.length ? (
                     <Box component="svg" viewBox={`0 0 ${width} ${height}`} sx={{ width: '100%', mt: 2 }}>
                         <line x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} stroke="#94a3b8" />
@@ -290,18 +290,18 @@ function StudentSpotlight({ student, onOpen, onPredict, loading }) {
         >
             <Stack direction="row" justifyContent="space-between" alignItems="start" spacing={2}>
                 <Stack direction="row" spacing={1.5} alignItems="center">
-                    <Avatar sx={{ bgcolor: riskColors[student.riskLevel] || '#0f766e' }}>{student.name?.[0] || 'S'}</Avatar>
+                    <Avatar sx={{ bgcolor: riskColors[student.predictedResult || student.riskLevel] || '#0f766e' }}>{student.name?.[0] || 'S'}</Avatar>
                     <Box>
                         <Typography fontWeight={700}>{student.name}</Typography>
                         <Typography variant="body2" color="text.secondary">{student.department} • Semester {student.semester}</Typography>
                     </Box>
                 </Stack>
-                <Chip label={`${student.riskScore} score`} size="small" color={student.riskLevel === 'High' ? 'error' : student.riskLevel === 'Moderate' ? 'warning' : 'success'} />
+                <Chip label={`${student.riskScore} score`} size="small" color={(student.predictedResult || student.riskLevel) === 'At Risk' ? 'error' : (student.predictedResult || student.riskLevel) === 'Needs Attention' ? 'warning' : 'success'} />
             </Stack>
             <Stack direction="row" spacing={1} mt={2} flexWrap="wrap" useFlexGap>
                 <Chip label={`GPA ${student.gpa}`} size="small" variant="outlined" />
                 <Chip label={`${student.attendance}% attendance`} size="small" variant="outlined" />
-                <Chip label={student.riskLevel} size="small" color={student.riskLevel === 'High' ? 'error' : student.riskLevel === 'Moderate' ? 'warning' : 'success'} variant="outlined" />
+                <Chip label={student.predictedResult || student.riskLevel} size="small" color={(student.predictedResult || student.riskLevel) === 'At Risk' ? 'error' : (student.predictedResult || student.riskLevel) === 'Needs Attention' ? 'warning' : 'success'} variant="outlined" />
             </Stack>
             <Stack direction="row" spacing={1} mt={2}>
                 <Button size="small" variant="contained" onClick={onOpen}>Open</Button>
@@ -484,12 +484,12 @@ function Dashboard() {
                                     />
                                 ))}
                                 <Chip
-                                    label="High Risk"
+                                    label="At Risk"
                                     clickable
-                                    color={filters.riskLevel === 'High' ? 'error' : 'default'}
-                                    variant={filters.riskLevel === 'High' ? 'filled' : 'outlined'}
+                                    color={filters.riskLevel === 'At Risk' ? 'error' : 'default'}
+                                    variant={filters.riskLevel === 'At Risk' ? 'filled' : 'outlined'}
                                     onClick={() => {
-                                        const next = { ...filtersRef.current, riskLevel: filtersRef.current.riskLevel === 'High' ? '' : 'High' };
+                                        const next = { ...filtersRef.current, riskLevel: filtersRef.current.riskLevel === 'At Risk' ? '' : 'At Risk' };
                                         setFilters(next);
                                         setPage(1);
                                         loadDashboard(next, 1, rowsPerPage);
@@ -520,11 +520,11 @@ function Dashboard() {
                                 <TextField fullWidth label="Subject" value={filters.subject} onChange={(event) => updateFilter('subject', event.target.value)} />
                             </Grid>
                             <Grid item xs={12} md={2}>
-                                <TextField select fullWidth label="Risk Level" value={filters.riskLevel} onChange={(event) => updateFilter('riskLevel', event.target.value)}>
-                                    <MenuItem value="">All Levels</MenuItem>
-                                    <MenuItem value="Low">Low</MenuItem>
-                                    <MenuItem value="Moderate">Moderate</MenuItem>
-                                    <MenuItem value="High">High</MenuItem>
+                                <TextField select fullWidth label="Prediction Status" value={filters.riskLevel} onChange={(event) => updateFilter('riskLevel', event.target.value)}>
+                                    <MenuItem value="">All Statuses</MenuItem>
+                                    <MenuItem value="On Track">On Track</MenuItem>
+                                    <MenuItem value="Needs Attention">Needs Attention</MenuItem>
+                                    <MenuItem value="At Risk">At Risk</MenuItem>
                                 </TextField>
                             </Grid>
                             <Grid item xs={12}>
@@ -546,7 +546,7 @@ function Dashboard() {
                         >
                             <Tab value="overview" label="Overview" />
                             <Tab value="cohort" label="Cohort Explorer" />
-                            <Tab value="watchlist" label="Risk Watchlist" />
+                            <Tab value="watchlist" label="Intervention Queue" />
                         </Tabs>
                         <Divider />
 
@@ -557,7 +557,7 @@ function Dashboard() {
                                     <Grid item xs={12} md={2.4}><MetricCard title="Average GPA" value={summary.avgGpa || 0} subtitle="Current GPA snapshot across the filtered cohort" tone="success" progress={(summary.avgGpa || 0) * 10} /></Grid>
                                     <Grid item xs={12} md={2.4}><MetricCard title="Average Attendance" value={`${summary.avgAttendance || 0}%`} subtitle="Cross-department attendance pulse" tone="info" progress={summary.avgAttendance || 0} /></Grid>
                                     <Grid item xs={12} md={2.4}><MetricCard title="Average Marks" value={`${summary.avgMarks || 0}%`} subtitle="Mean marks across enrolled subjects" tone="warning" progress={summary.avgMarks || 0} /></Grid>
-                                    <Grid item xs={12} md={2.4}><MetricCard title="At Risk" value={summary.atRiskCount || 0} subtitle={`${summary.passRate || 0}% predicted on track`} tone="error" progress={100 - (summary.passRate || 0)} /></Grid>
+                                    <Grid item xs={12} md={2.4}><MetricCard title="At Risk" value={summary.atRiskCount || 0} subtitle={`${summary.passRate || 0}% currently on track`} tone="error" progress={100 - (summary.passRate || 0)} /></Grid>
                                 </Grid>
 
                                 <Grid container spacing={3} mt={1}>
@@ -595,7 +595,7 @@ function Dashboard() {
                                     </Grid>
                                     <Grid item xs={12} lg={4}>
                                         <DistributionCard
-                                            title="Risk Distribution"
+                                            title="Prediction Distribution"
                                             distribution={analytics?.riskDistribution || {}}
                                             activeRisk={filters.riskLevel}
                                             onSelectRisk={(riskLevel) => {
@@ -690,8 +690,8 @@ function Dashboard() {
                                                                     <TableCell>
                                                                         <Chip
                                                                             size="small"
-                                                                            label={student.riskLevel || student.analyticsRisk?.riskLevel || 'Moderate'}
-                                                                            color={(student.riskLevel || student.analyticsRisk?.riskLevel) === 'High' ? 'error' : (student.riskLevel || student.analyticsRisk?.riskLevel) === 'Moderate' ? 'warning' : 'success'}
+                                                                            label={student.predictedResult || student.latestPrediction?.predictedResult || student.analyticsRisk?.predictedResult || 'Needs Attention'}
+                                                                            color={(student.predictedResult || student.latestPrediction?.predictedResult || student.analyticsRisk?.predictedResult) === 'At Risk' ? 'error' : (student.predictedResult || student.latestPrediction?.predictedResult || student.analyticsRisk?.predictedResult) === 'Needs Attention' ? 'warning' : 'success'}
                                                                         />
                                                                     </TableCell>
                                                                     <TableCell align="right">
@@ -764,8 +764,8 @@ function Dashboard() {
                                     <Grid item xs={12} lg={5}>
                                         <Card sx={{ borderRadius: 5, height: '100%' }}>
                                             <CardContent>
-                                                <Typography variant="h6">At-Risk Students</Typography>
-                                                <Typography variant="body2" color="text.secondary">This is your intervention queue. Open profiles to review subjects and trigger fresh predictions.</Typography>
+                                                <Typography variant="h6">Intervention Queue</Typography>
+                                                <Typography variant="body2" color="text.secondary">Students predicted as At Risk appear here first. Open profiles to review gaps and trigger fresh predictions.</Typography>
                                                 <Stack spacing={1.5} mt={3}>
                                                     {(analytics?.topRiskStudents || []).length ? analytics.topRiskStudents.map((student) => (
                                                         <StudentSpotlight
@@ -775,7 +775,7 @@ function Dashboard() {
                                                             onOpen={() => navigate(`/students/${student._id}`)}
                                                             onPredict={() => handlePredictResult(student._id)}
                                                         />
-                                                    )) : <Typography color="text.secondary">No students are currently flagged as high risk.</Typography>}
+)) : <Typography color="text.secondary">No students are currently predicted as At Risk.</Typography>}
                                                 </Stack>
                                             </CardContent>
                                         </Card>

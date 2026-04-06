@@ -108,6 +108,15 @@ function StudentDetails() {
     if (!student) return null;
 
     const risk = student.analyticsRisk || {};
+    const latestPrediction = student.predictions?.length ? student.predictions[student.predictions.length - 1] : null;
+    const currentPrediction = latestPrediction?.predictedResult || risk.predictedResult || 'Needs Attention';
+    const getPredictionColor = (prediction) => {
+        if (prediction === 'At Risk' || prediction === 'Fail') return '#c62828';
+        if (prediction === 'Needs Attention') return '#ef6c00';
+        return '#2e7d32';
+    };
+    const formatProbability = (value) => typeof value === 'number' ? `${(value * 100).toFixed(1)}%` : '--';
+    const probabilityOrder = ['At Risk', 'Needs Attention', 'On Track'];
 
     return (
         <Container maxWidth="lg" sx={{ mt: 4 }}>
@@ -120,8 +129,9 @@ function StudentDetails() {
                             <Typography color="text.secondary">Student ID: {student.studentId || 'N/A'}</Typography>
                         </Box>
                         <Stack direction="row" spacing={1} alignItems="start">
-                            <Chip label={`${risk.riskLevel || student.riskLevel || 'Moderate'} Risk`} color={risk.riskLevel === 'High' ? 'error' : risk.riskLevel === 'Moderate' ? 'warning' : 'success'} />
+                            <Chip label={currentPrediction} sx={{ color: 'white', bgcolor: getPredictionColor(currentPrediction) }} />
                             <Chip label={`${risk.riskScore || 0} Risk Score`} variant="outlined" />
+                            {latestPrediction?.probabilities ? <Chip label={`Confidence ${formatProbability(latestPrediction.probabilities[currentPrediction])}`} variant="outlined" /> : null}
                         </Stack>
                     </Box>
 
@@ -192,8 +202,9 @@ function StudentDetails() {
                             <TableCell>Study Hours</TableCell>
                             <TableCell>Previous Marks</TableCell>
                             <TableCell>Assignment Score</TableCell>
-                            <TableCell>Risk Level</TableCell>
                             <TableCell>Risk Score</TableCell>
+                            <TableCell>Reasons</TableCell>
+                            <TableCell>Probabilities</TableCell>
                             <TableCell>Predicted Result</TableCell>
                         </TableRow>
                     </TableHead>
@@ -205,12 +216,52 @@ function StudentDetails() {
                                 <TableCell>{pred.studyHours}</TableCell>
                                 <TableCell>{pred.previousMarks}</TableCell>
                                 <TableCell>{pred.assignmentScore}</TableCell>
-                                <TableCell>{pred.riskLevel || '--'}</TableCell>
                                 <TableCell>{pred.riskScore ?? '--'}</TableCell>
+                                <TableCell sx={{ maxWidth: 320 }}>
+                                    {Array.isArray(pred.reasons) && pred.reasons.length ? (
+                                        <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                                            {pred.reasons.map((reason) => (
+                                                <Chip
+                                                    key={`${pred._id}-${reason}`}
+                                                    label={reason}
+                                                    size="small"
+                                                    variant="outlined"
+                                                    sx={{ borderRadius: 2 }}
+                                                />
+                                            ))}
+                                        </Stack>
+                                    ) : '--'}
+                                </TableCell>
+                                <TableCell sx={{ minWidth: 220 }}>
+                                    {pred.probabilities ? (
+                                        <Stack spacing={0.75}>
+                                            {probabilityOrder.map((label) => (
+                                                <Box key={`${pred._id}-${label}`}>
+                                                    <Box display="flex" justifyContent="space-between" alignItems="center" mb={0.25}>
+                                                        <Typography variant="caption" color="text.secondary">{label}</Typography>
+                                                        <Typography variant="caption" fontWeight={700}>{formatProbability(pred.probabilities[label])}</Typography>
+                                                    </Box>
+                                                    <Box sx={{ height: 6, borderRadius: 999, bgcolor: 'rgba(15, 23, 42, 0.08)', overflow: 'hidden' }}>
+                                                        <Box
+                                                            sx={{
+                                                                width: formatProbability(pred.probabilities[label]),
+                                                                height: '100%',
+                                                                borderRadius: 999,
+                                                                bgcolor: getPredictionColor(label),
+                                                            }}
+                                                        />
+                                                    </Box>
+                                                </Box>
+                                            ))}
+                                        </Stack>
+                                    ) : '--'}
+                                </TableCell>
                                 <TableCell>
-                                    <strong style={{ color: pred.predictedResult === 'At Risk' || pred.predictedResult === 'Fail' ? '#c62828' : '#2e7d32' }}>
-                                        {pred.predictedResult}
-                                    </strong>
+                                    <Chip
+                                        label={pred.predictedResult}
+                                        size="small"
+                                        sx={{ color: 'white', bgcolor: getPredictionColor(pred.predictedResult), fontWeight: 700 }}
+                                    />
                                 </TableCell>
                             </TableRow>
                         ))}

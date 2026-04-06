@@ -61,10 +61,9 @@ export const getStudents = async (req, res) => {
         if (department) matchStage.department = { $regex: department, $options: 'i' };
         if (semester) matchStage.semester = Number(semester);
         if (gender) matchStage.gender = { $regex: gender, $options: 'i' };
-        if (riskLevel) matchStage.riskLevel = riskLevel;
         if (subject) matchStage['subjects.name'] = { $regex: subject, $options: 'i' };
 
-        const students = await Student.aggregate([
+        let students = await Student.aggregate([
             { $match: matchStage },
             {
                 $addFields: {
@@ -77,19 +76,29 @@ export const getStudents = async (req, res) => {
                 }
             },
             { $sort: { name: 1 } }, // Optional: sort alphabetically by name
-            { $skip: skip },
-            { $limit: parseInt(limit) }
         ]);
 
-        const total = await Student.countDocuments(matchStage);
-        const enrichedStudents = students.map((student) => {
+        let enrichedStudents = students.map((student) => {
             const riskProfile = calculateRiskProfile(student);
+            const latestPrediction = Array.isArray(student.predictions) && student.predictions.length ? student.predictions[0] : null;
+            const predictedResult = latestPrediction?.predictedResult || riskProfile.predictedResult;
             return {
                 ...student,
                 analyticsRisk: riskProfile,
                 riskLevel: student.riskLevel || riskProfile.riskLevel,
+                predictedResult,
+                latestPrediction,
             };
         });
+
+        if (riskLevel) {
+            enrichedStudents = enrichedStudents.filter((student) => student.predictedResult === riskLevel);
+        }
+
+        const total = enrichedStudents.length;
+        const startIndex = skip;
+        const endIndex = skip + parseInt(limit);
+        enrichedStudents = enrichedStudents.slice(startIndex, endIndex);
 
         res.status(200).json({
             statusCode: 200,

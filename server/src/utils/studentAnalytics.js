@@ -22,6 +22,9 @@ export const calculateRiskProfile = (student = {}) => {
     const subjectAverage = student.subjects?.length
         ? average(student.subjects.map((subject) => subject.marks))
         : average([student.previousMarks, student.assignmentScore * 10]);
+    const subjectAttendanceAverage = student.subjects?.length
+        ? average(student.subjects.map((subject) => subject.attendance))
+        : toNumber(student.attendance, 0);
 
     const normalizedGpa = Math.min(100, toNumber(student.gpa, 0) * 10);
     const attendance = Math.min(100, toNumber(student.attendance, 0));
@@ -29,33 +32,106 @@ export const calculateRiskProfile = (student = {}) => {
     const assignmentScore = Math.min(100, toNumber(student.assignmentScore, 0) * 10);
     const previousMarks = Math.min(100, toNumber(student.previousMarks, 0));
 
-    const readinessScore = (
-        attendance * 0.25 +
-        previousMarks * 0.2 +
-        assignmentScore * 0.15 +
-        normalizedGpa * 0.2 +
-        studyHours * 0.1 +
-        subjectAverage * 0.1
-    );
+    const supportAverage = (
+        attendance +
+        previousMarks +
+        subjectAverage +
+        subjectAttendanceAverage +
+        assignmentScore +
+        normalizedGpa
+    ) / 6;
 
-    const riskScore = Math.max(0, Math.min(100, Math.round(100 - readinessScore)));
+    const severeSignals = [
+        attendance < 45,
+        previousMarks < 45,
+        subjectAverage < 45,
+        subjectAttendanceAverage < 48,
+        normalizedGpa < 50,
+        assignmentScore < 45,
+        toNumber(student.studyHours, 0) < 1,
+    ].filter(Boolean).length;
+
+    const readinessScore = Math.round(supportAverage * 100) / 100;
+    const riskScore = Math.max(0, Math.min(100, Math.round(100 - supportAverage)));
+
+    let predictedResult = 'On Track';
+    if (supportAverage < 50 || severeSignals >= 3) {
+        predictedResult = 'At Risk';
+    } else if (supportAverage < 65 || severeSignals >= 1) {
+        predictedResult = 'Needs Attention';
+    }
+
     let riskLevel = 'Low';
-
-    if (riskScore >= 65) {
+    if (predictedResult === 'At Risk') {
         riskLevel = 'High';
-    } else if (riskScore >= 35) {
+    } else if (predictedResult === 'Needs Attention') {
         riskLevel = 'Moderate';
     }
 
-    const predictedResult = riskScore >= 55 ? 'At Risk' : 'On Track';
-
     return {
-        readinessScore: Math.round(readinessScore * 100) / 100,
+        readinessScore,
         riskScore,
         riskLevel,
         predictedResult,
         subjectAverage: Math.round(subjectAverage * 100) / 100,
     };
+};
+
+export const derivePredictionReasons = (student = {}) => {
+    const reasons = [];
+    const subjectAverage = student.subjects?.length
+        ? average(student.subjects.map((subject) => subject.marks))
+        : average([student.previousMarks, student.assignmentScore * 10]);
+    const subjectAttendanceAverage = student.subjects?.length
+        ? average(student.subjects.map((subject) => subject.attendance))
+        : toNumber(student.attendance, 0);
+
+    const metrics = [
+        {
+            isWeak: toNumber(student.gpa, 0) < 6.5,
+            message: `Low GPA (${toNumber(student.gpa, 0).toFixed(1)})`,
+        },
+        {
+            isWeak: toNumber(student.attendance, 0) < 65,
+            message: `Low attendance (${Math.round(toNumber(student.attendance, 0))}%)`,
+        },
+        {
+            isWeak: toNumber(student.previousMarks, 0) < 60,
+            message: `Low previous marks (${Math.round(toNumber(student.previousMarks, 0))}%)`,
+        },
+        {
+            isWeak: toNumber(student.assignmentScore, 0) < 6,
+            message: `Low assignment score (${toNumber(student.assignmentScore, 0).toFixed(1)}/10)`,
+        },
+        {
+            isWeak: toNumber(student.studyHours, 0) < 2,
+            message: `Low study hours (${toNumber(student.studyHours, 0).toFixed(1)} hrs/day)`,
+        },
+        {
+            isWeak: subjectAverage < 60,
+            message: `Low subject average (${Math.round(subjectAverage)}%)`,
+        },
+        {
+            isWeak: subjectAttendanceAverage < 65,
+            message: `Low subject attendance (${Math.round(subjectAttendanceAverage)}%)`,
+        },
+        {
+            isWeak: toNumber(student.creditsEarned, 0) < 20,
+            message: `Low credits earned (${Math.round(toNumber(student.creditsEarned, 0))})`,
+        },
+    ];
+
+    metrics.forEach((metric) => {
+        if (metric.isWeak) {
+            reasons.push(metric.message);
+        }
+    });
+
+    if (!reasons.length) {
+        reasons.push("Performance indicators are currently stable");
+    }
+
+    return reasons.slice(0, 4);
 };
 
 export const buildStudentPayload = (payload = {}) => {

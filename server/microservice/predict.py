@@ -11,5 +11,14 @@ model = joblib.load(model_path)
 
 payload = json.loads(sys.argv[1])
 features = pd.DataFrame([payload])
-result = model.predict(features)[0]
-print("On Track" if result == 1 else "At Risk")
+prediction = str(model.predict(features)[0])
+probabilities = model.predict_proba(features)[0]
+probability_map = {
+    str(label): round(float(probability), 4)
+    for label, probability in zip(model.classes_, probabilities)
+}
+
+print(json.dumps({
+    "prediction": prediction,
+    "probabilities": probability_map,
+}))

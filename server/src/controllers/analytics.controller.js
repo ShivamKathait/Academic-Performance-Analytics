@@ -9,7 +9,6 @@ const buildMatchStage = (teacherId, query = {}) => {
     if (query.department) match.department = regexFilter(query.department);
     if (query.gender) match.gender = regexFilter(query.gender);
     if (query.semester) match.semester = Number(query.semester);
-    if (query.riskLevel) match.riskLevel = query.riskLevel;
     if (query.name) match.name = regexFilter(query.name);
     if (query.subject) match['subjects.name'] = regexFilter(query.subject);
 
@@ -26,7 +25,7 @@ export const getDashboardAnalytics = async (req, res) => {
         const match = buildMatchStage(req.teacher.id, req.query);
         const students = await Student.find(match).lean();
 
-        const enrichedStudents = students.map((student) => {
+        let enrichedStudents = students.map((student) => {
             const riskProfile = calculateRiskProfile(student);
             const latestPrediction = getLatestPrediction(student) || {
                 predictedResult: riskProfile.predictedResult,
@@ -41,18 +40,22 @@ export const getDashboardAnalytics = async (req, res) => {
             };
         });
 
+        if (req.query.riskLevel) {
+            enrichedStudents = enrichedStudents.filter((student) => student.latestPrediction?.predictedResult === req.query.riskLevel);
+        }
+
         const totalStudents = enrichedStudents.length;
         const avgAttendance = average(enrichedStudents.map((student) => student.attendance));
         const avgGpa = average(enrichedStudents.map((student) => student.gpa));
         const avgMarks = average(enrichedStudents.flatMap((student) => student.subjects?.map((subject) => subject.marks) || [student.previousMarks]));
-        const atRiskStudents = enrichedStudents.filter((student) => student.analyticsRisk.riskLevel === 'High');
-        const onTrackCount = enrichedStudents.filter((student) => student.analyticsRisk.predictedResult === 'On Track').length;
+        const atRiskStudents = enrichedStudents.filter((student) => student.latestPrediction?.predictedResult === 'At Risk');
+        const onTrackCount = enrichedStudents.filter((student) => student.latestPrediction?.predictedResult === 'On Track').length;
         const passRate = totalStudents ? (onTrackCount / totalStudents) * 100 : 0;
 
         const departmentMap = new Map();
         const semesterMap = new Map();
         const subjectMap = new Map();
-        const riskDistribution = { Low: 0, Moderate: 0, High: 0 };
+        const riskDistribution = { 'On Track': 0, 'Needs Attention': 0, 'At Risk': 0 };
         const genderDistribution = {};
         const attendanceCorrelation = [];
 
@@ -62,7 +65,7 @@ export const getDashboardAnalytics = async (req, res) => {
             deptBucket.students += 1;
             deptBucket.totalGpa += Number(student.gpa || 0);
             deptBucket.totalAttendance += Number(student.attendance || 0);
-            if (student.analyticsRisk.riskLevel === 'High') deptBucket.atRisk += 1;
+            if (student.latestPrediction?.predictedResult === 'At Risk') deptBucket.atRisk += 1;
             departmentMap.set(deptKey, deptBucket);
 
             const semesterKey = `${student.semester || 0}`;
@@ -73,7 +76,8 @@ export const getDashboardAnalytics = async (req, res) => {
             semBucket.totalRisk += Number(student.analyticsRisk.riskScore || 0);
             semesterMap.set(semesterKey, semBucket);
 
-            riskDistribution[student.analyticsRisk.riskLevel] += 1;
+            const predictionBand = student.latestPrediction?.predictedResult || student.analyticsRisk.predictedResult;
+            riskDistribution[predictionBand] = (riskDistribution[predictionBand] || 0) + 1;
             genderDistribution[student.gender] = (genderDistribution[student.gender] || 0) + 1;
 
             const studentAvgMarks = student.subjects?.length
@@ -85,7 +89,7 @@ export const getDashboardAnalytics = async (req, res) => {
                 name: student.name,
                 attendance: Number(student.attendance || 0),
                 marks: Math.round(studentAvgMarks),
-                riskLevel: student.analyticsRisk.riskLevel,
+                riskLevel: student.latestPrediction?.predictedResult || student.analyticsRisk.predictedResult,
             });
 
             for (const subject of student.subjects || []) {
@@ -149,7 +153,7 @@ export const getDashboardAnalytics = async (req, res) => {
                 gpa: student.gpa,
                 attendance: student.attendance,
                 riskScore: student.analyticsRisk.riskScore,
-                riskLevel: student.analyticsRisk.riskLevel,
+                riskLevel: student.latestPrediction?.predictedResult || student.analyticsRisk.predictedResult,
             }));
 
         res.status(200).json({
